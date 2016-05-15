@@ -6,13 +6,16 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import android.util.Log;
+
 public class HttpUtil {
 	public static void sendHttpRequest(final String address,final HttpCallbackListener listener)
 	{
 		new Thread(new Runnable(){
 
 			@Override
-			public void run() {
+			public void run()
+			{
 				// TODO Auto-generated method stub
 				HttpURLConnection connection=null;
 				try
@@ -34,6 +37,7 @@ public class HttpUtil {
 					{
 						//回调onFinish()方法
 						listener.onFinish(response.toString());
+						//Log.i("guiugtufguhiuygfut", "httputil");
 					}
 				}
 				catch(Exception e)

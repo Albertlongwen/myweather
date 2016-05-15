@@ -121,7 +121,7 @@ public class MyWeatherDB {
 			ContentValues values=new ContentValues();
 			values.put("county_name", county.getCountyName());
 			values.put("county_code", county.getCountyCode());
-			values.put("county_id", county.getCityId());
+			values.put("city_id", county.getCityId());//之前数据插入错误，数据库中的county表中没有county_id这一列
 			db.insert("County",null,values);
 		}
 		

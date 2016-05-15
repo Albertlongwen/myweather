@@ -3,11 +3,17 @@ package activity;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.R;
+import com.example.myweather.R;//正确地导入本地R包的方式
+
+//import android.R;//开始导错包，所以会出现无法调用R包的变量的情况
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.AdapterView;
@@ -25,6 +31,9 @@ import util.HttpUtil;
 import util.Utility;
 
 public class ChooseAreaActivity extends Activity {
+	
+	public static final String tag = "ChooseAreaActivity";
+	
 	public static final int LEVEL_PROVINCE=0;
 	public static final int LEVEL_CITY=1;
 	public static final int LEVEL_COUNTY=2;
@@ -48,10 +57,22 @@ public class ChooseAreaActivity extends Activity {
 	private City selectedCity;
 	//当前选中的级别
 	private int currentLevel;
+	
+	private boolean isFromWeatherActivity;
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		// TODO Auto-generated method stub
 		super.onCreate(savedInstanceState);
+		isFromWeatherActivity=getIntent().getBooleanExtra("from_weather_activity", false);
+		SharedPreferences prefs=PreferenceManager.getDefaultSharedPreferences(this);
+		
+		if(prefs.getBoolean("city_selected", false)&&!isFromWeatherActivity)
+		{
+			Intent intent=new Intent(this,WeatherActivity.class);
+			startActivity(intent);
+			finish();
+			return;
+		}
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.choose_area);
 		listView =(ListView)findViewById(R.id.list_view);
@@ -63,17 +84,24 @@ public class ChooseAreaActivity extends Activity {
 		listView.setOnItemClickListener(new OnItemClickListener(){
 
 			@Override
-			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+			public void onItemClick(AdapterView<?> arg0, View view, int index, long arg3) {
 				// TODO Auto-generated method stub
 				if(currentLevel==LEVEL_PROVINCE)
 				{
-					selectedProvince=provinceList.get(position);
+					selectedProvince=provinceList.get(index);
 					queryCities();
 				}
 				else if(currentLevel==LEVEL_CITY)
 				{
-					selectedCity=cityList.get(position);
+					selectedCity=cityList.get(index);
 					queryCounties();
+				}else if(currentLevel==LEVEL_COUNTY)
+				{
+					String countyCode=countyList.get(index).getCountyCode();
+					Intent intent=new Intent(ChooseAreaActivity.this,WeatherActivity.class);
+					intent.putExtra("county_code", countyCode);
+					startActivity(intent);
+					finish();
 				}
 			}		
 		});
@@ -98,7 +126,7 @@ public class ChooseAreaActivity extends Activity {
 		}
 		else
 		{
-			queryFromServer(null,"province");
+			queryFromServer(null,"Province");
 		}
 	}
 	
@@ -137,8 +165,7 @@ public class ChooseAreaActivity extends Activity {
 			listView.setSelection(0);
 			titleText.setText(selectedCity.getCityName());
 			currentLevel=LEVEL_COUNTY;
-		}
-		else
+		}else
 		{
 			queryFromServer(selectedCity.getCityCode(),"County");
 		}
@@ -147,9 +174,12 @@ public class ChooseAreaActivity extends Activity {
 	//从服务器加载数据
 	private void queryFromServer(final String code,final String type)
 	{
+		//中国天气网新的API接口地址http://m.weather.com.cn/atad/101010100.html 
+		
 		String address;
 		if(!TextUtils.isEmpty(code))
 		{
+			
 			address="http://www.weather.com.cn/data/list3/city"+code+".xml";
 		}
 		else
@@ -157,40 +187,46 @@ public class ChooseAreaActivity extends Activity {
 			address="http://www.weather.com.cn/data/list3/city.xml";
 		}
 		showProgressDialog();
-		HttpUtil.sendHttpRequest(address, new HttpCallbackListener(){
-
+		//连接服务器获取数据是在新的线程中进行的
+		HttpUtil.sendHttpRequest(address, 
+				new HttpCallbackListener(){
 			@Override
-			public void onFinish(String response) {
+			public void onFinish(String response) 
+			{
 				// TODO Auto-generated method stub
 				boolean result=false;
-				if("province".equals(type))
+				if("Province".equals(type))
 				{
+					//Log.i("guiugtufguhiuygfut", "province");
 					result=Utility.handleProvincesResponse(myWeatherDB, response);
 				}
-				else if("city".equals(type))
+				else if("City".equals(type))
 				{
+					//Log.i("guiugtufguhiuygfut", "city");
 					result=Utility.handleCitiesResponse(myWeatherDB, response, selectedProvince.getId());
 				}
-				else if("county".equals(type))
+				else if("County".equals(type))
 				{
+					//Log.i("guiugtufguhiuygfut", "county");
 					result=Utility.handleCountiesResponse(myWeatherDB, response, selectedCity.getId());
 				}
+				//Log.i("guiugtufguhiuygfut", "complete");
 				if(result)
 				{
-					//通过runOnUIThread（）方法回到主线程处理逻辑
+					//通过runOnUIThread（）方法回到UI主线程处理逻辑
 					runOnUiThread(new Runnable(){
 						public void run()
 						{
 							closeProgressDialog();
-							if("province".equals(type))
+							if("Province".equals(type))
 							{
 								queryProvinces();
 							}
-							else if("city".equals(type))
+							else if("City".equals(type))
 							{
 								queryCities();
 							}
-							else if("county".equals(type))
+							else if("County".equals(type))
 							{
 								queryCounties();
 							}
@@ -210,9 +246,8 @@ public class ChooseAreaActivity extends Activity {
 						Toast.makeText(ChooseAreaActivity.this, "加载失败", Toast.LENGTH_SHORT).show();
 					}
 				});
-			}
-			
-		});
+			}	
+		});//new 一个对象的结尾，调用sendHttpRequest结束
 	}
 	
 	//显示进度对话框
@@ -249,10 +284,12 @@ public class ChooseAreaActivity extends Activity {
 		}
 		else
 		{
+			if(isFromWeatherActivity)
+			{
+				Intent intent=new Intent(this,WeatherActivity.class);
+				startActivity(intent);
+			}
 			finish();
 		}
-	}
-	
-	
-	
+	}	
 }
